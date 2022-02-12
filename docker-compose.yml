@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    command: ["python", "-m", "project.bot"]
+    env_file:
+      - .env
+    volumes:
+      - photo-volume:/usr/src/app/photos
+
+  worker:
+    build: .
+    command: ["celery", "-A", "project.celery_task_app.worker.celery_app", "worker", "--loglevel=info"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - photo-volume:/usr/src/app/photos
+    depends_on:
+      - bot
+      - redis
+
+  redis:
+    image: redis:6-alpine
+
+volumes:
+  photo-volume:
