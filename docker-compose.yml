@@ -2,23 +2,26 @@ version: '3.8'
 
 services:
   bot:
-    build: .
+    image: app_image
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: ["python", "-m", "project.bot"]
     env_file:
       - .env
     volumes:
-      - photo-volume:/usr/src/app/photos
+      - photo-volume:/app/photos
 
   worker:
-    build: .
-    command: ["celery", "-A", "project.celery_task_app.worker.celery_app", "worker", "--loglevel=info"]
+    image: app_image
+    command: ["celery", "-A", "project.celery_task_app.worker", "worker", "--loglevel", "info", "--concurrency", "1"]
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     env_file:
       - .env
     volumes:
-      - photo-volume:/usr/src/app/photos
+      - photo-volume:/app/photos
     depends_on:
       - bot
       - redis

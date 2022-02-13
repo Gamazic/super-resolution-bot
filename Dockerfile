@@ -1,17 +1,37 @@
-FROM python:3.9.1-slim-buster
+FROM python:3.9.7-slim-bullseye as builder
 
-# set work directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+RUN apt-get update && apt-get install -y --no-install-recommends \ 
+        curl \
+        gcc \
+        && apt-get autoremove -yqq --purge \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
 
-# install dependencies
-RUN pip install --upgrade pip
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt
+RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+ENV PATH="${PATH}:/root/.poetry/bin"
 
-# copy project
-VOLUME [ "/usr/src/app/photos" ]
+COPY ./poetry.lock ./pyproject.toml ./
+
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
+
+# SSL for bot webhook
+ARG WEBHOOK_HOST=""
+RUN openssl genrsa -out webhook_pkey.pem 2048 &&\
+        openssl req -new -x509 -days 3650 -key webhook_pkey.pem -out webhook_cert.pem -subj "/CN=${WEBHOOK_HOST}"
+
+
+FROM python:3.9.7-slim-bullseye
+
+# python dependencies
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache /wheels/*
+
+# copy ssl cert
+COPY --from=builder /app/webhook_cert.pem /app/webhook_pkey.pem /app/
+
+WORKDIR /app
 COPY . .
+VOLUME ["/app/photos"]

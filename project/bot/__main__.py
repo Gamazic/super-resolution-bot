@@ -4,6 +4,7 @@ from project.bot.handlers import dp
 
 
 def start_polling():
+    """Start bot via polling."""
     executor.start_polling(dp, skip_updates=True)
 
 
